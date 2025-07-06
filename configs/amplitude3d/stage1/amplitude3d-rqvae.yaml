@@ -1,6 +1,6 @@
 dataset:
   type: amplitude3d
-  root: data/amplitude
+  root: /home/gpoloudenny/Projects/crystallography/data/mp20/amplitudes
   data_key: amplitudes
   hkl_max_index: 10
   transforms:

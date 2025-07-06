@@ -3,9 +3,11 @@ import torch
 from torch.utils.data import Dataset
 from pathlib import Path
 from typing import Optional
+import h5py
+
 
 class Amplitude3D(Dataset):
-    """Dataset loading 3D amplitude tensors from npz files."""
+    """Dataset loading 3D amplitude tensors from ``npz`` or ``h5`` files."""
 
     def __init__(self, root: str, split: str = "train", transform=None,
                  key: str = "amplitudes", max_index: Optional[int] = None):
@@ -15,11 +17,17 @@ class Amplitude3D(Dataset):
         self.key = key
         self.max_index = max_index
 
-        file = self.root / f"{split}.npz"
-        if not file.exists():
-            raise FileNotFoundError(f"Amplitude file not found: {file}")
+        npz_file = self.root / f"{split}.npz"
+        h5_file = self.root / f"{split}.h5"
 
-        data = np.load(file)[key]
+        if npz_file.exists():
+            data = np.load(npz_file)[key]
+        elif h5_file.exists():
+            with h5py.File(h5_file, 'r') as f:
+                data = f[key][:]
+        else:
+            raise FileNotFoundError(
+                f"Amplitude file not found: {npz_file} or {h5_file}")
         if self.max_index is not None:
             data = data[: self.max_index]
         self.data = data

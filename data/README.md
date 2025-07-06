@@ -70,8 +70,21 @@ wget https://twg.kakaocdn.net/brainrepo/etc/RQVAE/54599b4b2286fdc2252d927aa3fd55
 ```
 
 ## Amplitude3D
-Place your amplitude dataset in `data/amplitude`. Each split should be stored in
-`train.npz` and `val.npz` containing a numpy array named with the key specified
-by `data_key` (default: `amplitudes`). The optional `hkl_max_index` parameter can
-be used to truncate the number of loaded samples.
+Place your amplitude dataset in `data/amplitude`. Each split can be stored in
+either `train.npz`/`val.npz` or `train.h5`/`val.h5`. The arrays inside the file
+should share the same key specified by `data_key` (default: `amplitudes`). The
+optional `hkl_max_index` parameter can be used to truncate the number of loaded
+samples.
+
+Example to convert a NumPy archive to HDF5:
+
+```python
+import numpy as np, h5py
+arr = np.load('train.npz')['amplitudes']
+with h5py.File('train.h5', 'w') as f:
+    f.create_dataset('amplitudes', data=arr)
+```
+
+`Amplitude3D` will automatically detect which extension is available when
+loading each split.
 
