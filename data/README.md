@@ -69,3 +69,9 @@ cd $COCO_ROOT_DIR/annotations
 wget https://twg.kakaocdn.net/brainrepo/etc/RQVAE/54599b4b2286fdc2252d927aa3fd55eb/captions_val2014_30K_samples.json
 ```
 
+## Amplitude3D
+Place your amplitude dataset in `data/amplitude`. Each split should be stored in
+`train.npz` and `val.npz` containing a numpy array named with the key specified
+by `data_key` (default: `amplitudes`). The optional `hkl_max_index` parameter can
+be used to truncate the number of loaded samples.
+

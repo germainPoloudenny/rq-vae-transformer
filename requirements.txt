@@ -5,11 +5,11 @@ pyflakes==2.2.0
 PyYAML==5.3.1
 tqdm==4.46.0
 tensorboard==2.3.0
-#scikit-learn==0.24.0
+scikit-learn==0.24.0
 omegaconf
-#pickle5
+pickle5
 matplotlib
-tokenizers>=0.10.2
+tokenizers==0.10.3
 ftfy
 regex
 datadings
