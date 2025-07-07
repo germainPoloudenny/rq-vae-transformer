@@ -49,11 +49,23 @@ class Downsample(nn.Module):
 
     def forward(self, x):
         if self.with_conv:
-            pad = (0,1,0,1)
+            h, w = x.shape[-2:]  # input spatial size
+            pad_h = 1
+            pad_w = 1
+            # when the spatial size is smaller than the kernel size (3x3),
+            # we pad more so that the padded size becomes at least 3x3
+            if h + pad_h < 3:
+                pad_h = 3 - h
+            if w + pad_w < 3:
+                pad_w = 3 - w
+
+            pad = (0, pad_w, 0, pad_h)
             x = torch.nn.functional.pad(x, pad, mode="constant", value=0)
-            x = self.conv(x)
+            if h >= 1 and w >= 1:
+                x = self.conv(x)
         else:
-            x = torch.nn.functional.avg_pool2d(x, kernel_size=2, stride=2)
+            if x.shape[-1] >= 2 and x.shape[-2] >= 2:
+                x = torch.nn.functional.avg_pool2d(x, kernel_size=2, stride=2)
         return x
 
 
