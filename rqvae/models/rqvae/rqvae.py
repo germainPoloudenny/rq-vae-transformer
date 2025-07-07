@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -117,6 +116,9 @@ class RQVAE(Stage1Model):
         return xs_real, xs_recon
 
     def compute_loss(self, out, quant_loss, code, xs=None, valid=False):
+
+        if xs is not None and out.shape[-2:] != xs.shape[-2:]:
+            out = F.interpolate(out, size=xs.shape[-2:], mode="bilinear", align_corners=False)
 
         if self.loss_type == 'mse':
             loss_recon = F.mse_loss(out, xs, reduction='mean')
