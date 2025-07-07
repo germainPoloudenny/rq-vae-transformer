@@ -392,6 +392,12 @@ class Trainer(TrainerTemplate):
         xs_recon = model(xs_real)[0]
         xs_real, xs_recon = model.module.get_recon_imgs(xs_real, xs_recon)
 
+        # select up to three channels for visualization to avoid tensorboard
+        # errors when the dataset contains multi-channel images.
+        if xs_real.shape[1] > 3:
+            xs_real = xs_real[:, :3]
+            xs_recon = xs_recon[:, :3]
+
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
         grid = torchvision.utils.make_grid(grid, nrow=8)
         self.writer.add_image('reconstruction', grid, mode, epoch)
@@ -416,6 +422,10 @@ class Trainer(TrainerTemplate):
         xs_real = xs[:16]
         xs_recon = model_fn.forward_partial_code(xs_real, code_idx, decode_type)
         xs_real, xs_recon = model_fn.get_recon_imgs(xs_real, xs_recon)
+
+        if xs_real.shape[1] > 3:
+            xs_real = xs_real[:, :3]
+            xs_recon = xs_recon[:, :3]
 
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
         grid = torchvision.utils.make_grid(grid, nrow=8)
