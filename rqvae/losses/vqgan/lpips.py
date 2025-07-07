@@ -8,6 +8,21 @@ from collections import namedtuple
 from .lpips_utils import get_ckpt_path
 
 
+def _ensure_three_channels(x: torch.Tensor) -> torch.Tensor:
+    """Adjust input to have exactly 3 channels.
+
+    If ``x`` has fewer than 3 channels, channels are repeated. If it has more
+    than 3, only the first three channels are used.
+    """
+    c = x.shape[1]
+    if c == 3:
+        return x
+    if c < 3:
+        repeat = 3 // c + 1
+        x = x.repeat(1, repeat, 1, 1)
+    return x[:, :3]
+
+
 class LPIPS(nn.Module):
     # Learned perceptual metric
     def __init__(self, use_dropout=True):
@@ -39,6 +54,8 @@ class LPIPS(nn.Module):
         return model
 
     def forward(self, input, target, reduction='mean'):
+        input = _ensure_three_channels(input)
+        target = _ensure_three_channels(target)
         in0_input, in1_input = (self.scaling_layer(input), self.scaling_layer(target))
         outs0, outs1 = self.net(in0_input), self.net(in1_input)
         feats0, feats1, diffs = {}, {}, {}
