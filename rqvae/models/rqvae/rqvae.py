@@ -108,6 +108,10 @@ class RQVAE(Stage1Model):
         return decoded
 
     def get_recon_imgs(self, xs_real, xs_recon):
+        """Convert real and reconstructed tensors into images for visualization."""
+
+        if xs_recon.shape[-2:] != xs_real.shape[-2:]:
+            xs_recon = F.interpolate(xs_recon, size=xs_real.shape[-2:], mode="bilinear", align_corners=False)
 
         xs_real = xs_real * 0.5 + 0.5
         xs_recon = xs_recon * 0.5 + 0.5
