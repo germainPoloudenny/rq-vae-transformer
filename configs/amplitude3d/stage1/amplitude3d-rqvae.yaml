@@ -13,8 +13,11 @@ arch:
     bottleneck_type: rq
     embed_dim: 256
     n_embed: 2048
-    latent_shape: [ 8, 8, 256 ]
-    code_shape: [ 8, 8, 4 ]
+    # Small amplitudes of size 21x21 become too small after six
+    # downsampling stages. Reduce the network depth so that the
+    # latent resolution remains valid.
+    latent_shape: [ 1, 1, 256 ]
+    code_shape: [ 1, 1, 4 ]
     shared_codebook: true
     decay: 0.99
     restart_unused_codes: true
@@ -28,7 +31,8 @@ arch:
     in_channels: 11
     out_ch: 11
     ch: 64
-    ch_mult: [ 1, 1, 2, 2, 4, 4]
+    # Use five stages instead of six to avoid the 0x0 latent feature map.
+    ch_mult: [ 1, 1, 2, 2, 4 ]
     num_res_blocks: 2
     attn_resolutions: [ 16 ]
     dropout: 0.00
