@@ -88,3 +88,7 @@ with h5py.File('train.h5', 'w') as f:
 `Amplitude3D` will automatically detect which extension is available when
 loading each split.
 
+Alternatively you can provide a single file (for example `normalized.h5`).
+In this case the dataset is split on the fly using the `val_split` ratio
+(default `0.1`) passed to `Amplitude3D` when creating the dataset.
+

@@ -17,12 +17,15 @@ def create_dataset(config, is_eval=False, logger=None):
 
     if config.dataset.type == 'amplitude3d':
         root = root if root else 'data/amplitude'
+        val_split = config.dataset.get('val_split', 0.1)
         dataset_trn = Amplitude3D(root, split='train', transform=transforms_trn,
                                   key=config.dataset.get('data_key', 'amplitudes'),
-                                  max_index=config.dataset.get('hkl_max_index', None))
+                                  max_index=config.dataset.get('hkl_max_index', None),
+                                  val_split=val_split)
         dataset_val = Amplitude3D(root, split='val', transform=transforms_val,
                                   key=config.dataset.get('data_key', 'amplitudes'),
-                                  max_index=config.dataset.get('hkl_max_index', None))
+                                  max_index=config.dataset.get('hkl_max_index', None),
+                                  val_split=val_split)
     elif config.dataset.type == 'imagenet':
         root = root if root else 'data/imagenet'
         dataset_trn = ImageNet(root, split='train', transform=transforms_trn)
