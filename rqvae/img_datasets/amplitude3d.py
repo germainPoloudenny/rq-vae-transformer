@@ -55,7 +55,16 @@ class Amplitude3D(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = torch.from_numpy(self.data[idx]).float()
+        amplitude = torch.from_numpy(self.data[idx]).float()
+
+        if amplitude.dim() == 1 and self.max_index is not None:
+            side = 2 * self.max_index + 1
+            base = side ** 2
+            num_valid_slices = amplitude.numel() // base
+            amplitude = amplitude.reshape(side, side, num_valid_slices)
+            amplitude = amplitude.permute(2, 0, 1)
+
         if self.transform:
-            sample = self.transform(sample)
-        return sample, 0
+            amplitude = self.transform(amplitude)
+
+        return amplitude, 0
