@@ -4,7 +4,7 @@ dataset:
   data_key: amplitudes
   hkl_max_index: 10
   pad_to_cube: true
-  cube_size: 32
+  cube_size: 21
   transforms:
     type: none
 
@@ -15,9 +15,8 @@ arch:
     bottleneck_type: rq
     embed_dim: 256
     n_embed: 2048
-    # Small amplitudes of size 21x21 become too small after six
-    # downsampling stages. Reduce the network depth so that the
-    # latent resolution remains valid.
+    # Five downsampling stages keep 21×21×21 volumes large enough
+    # to produce a 1×1×1 latent representation.
     latent_shape: [ 1, 1, 256 ]
     code_shape: [ 1, 1, 4 ]
     shared_codebook: true
@@ -34,7 +33,7 @@ arch:
     out_ch: 1
     dim: 3
     ch: 64
-    # Use five stages instead of six to avoid the 0x0 latent feature map.
+    # Use five stages to downsample 21³ volumes to a single latent voxel.
     ch_mult: [ 1, 1, 2, 2, 4 ]
     num_res_blocks: 2
     attn_resolutions: [ 16 ]
