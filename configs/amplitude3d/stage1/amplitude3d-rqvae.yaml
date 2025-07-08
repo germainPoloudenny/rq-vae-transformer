@@ -62,7 +62,7 @@ experiment:
 gan:
   disc:
     arch:
-      in_channels: 11
+      in_channels: 1
       num_layers: 2
       use_actnorm: False
       ndf: 64

@@ -2,8 +2,25 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Tuple
 import h5py
+
+
+def generate_hkl_list(hkl_max_index: int) -> List[Tuple[int, int, int]]:
+    """Return the list of (h, k, l) coordinates for a given ``hkl_max_index``.
+
+    The ordering is identical to the layout expected by ``Amplitude3D`` when a
+    flat array is reshaped into a volume. The central (0, 0, 0) element is
+    omitted from the returned list.
+    """
+
+    return [
+        (h, k, l)
+        for h in range(-hkl_max_index, hkl_max_index + 1)
+        for k in range(-hkl_max_index, hkl_max_index + 1)
+        for l in range(0, hkl_max_index + 1)
+        if not (h == 0 and k == 0 and l == 0)
+    ]
 
 
 class Amplitude3D(Dataset):
@@ -17,6 +34,7 @@ class Amplitude3D(Dataset):
         self.transform = transform
         self.key = key
         self.max_index = max_index
+        self.hkl_list = generate_hkl_list(max_index) if max_index is not None else None
         self.val_split = val_split
 
         if self.root.is_file():
@@ -60,9 +78,15 @@ class Amplitude3D(Dataset):
         if amplitude.dim() == 1 and self.max_index is not None:
             side = 2 * self.max_index + 1
             base = side ** 2
-            num_valid_slices = amplitude.numel() // base
+            expected_len = len(self.hkl_list)
+            amplitude = amplitude[:expected_len]
+            num_valid_slices = expected_len // base
             amplitude = amplitude.reshape(side, side, num_valid_slices)
             amplitude = amplitude.permute(2, 0, 1)
+
+        if amplitude.dim() == 3:
+            # convert to (C, D, H, W) for ``Conv3d`` with a single channel
+            amplitude = amplitude.unsqueeze(0)
 
         if self.transform:
             amplitude = self.transform(amplitude)
