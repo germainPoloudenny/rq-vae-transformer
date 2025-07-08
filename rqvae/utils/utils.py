@@ -23,7 +23,8 @@ def compute_p_norm(model):
 
 def get_num_conv_linear_layers(model):
     cnt = 0
-    weight_modules = (torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d)
+    weight_modules = (torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d,
+                      torch.nn.Conv3d, torch.nn.ConvTranspose3d)
     for mn, m in model.named_modules():
         for pn, p in m.named_parameters():
             if pn.endswith('weight') and isinstance(m, weight_modules):

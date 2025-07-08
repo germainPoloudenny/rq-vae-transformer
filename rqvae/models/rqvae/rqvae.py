@@ -38,6 +38,7 @@ class RQVAE(Stage1Model):
 
         assert loss_type in ['mse', 'l1']
 
+        self.dim = ddconfig.get("dim", 2)
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
 
@@ -64,8 +65,9 @@ class RQVAE(Stage1Model):
         else:
             raise ValueError("invalid 'bottleneck_type' (must be 'rq')")
 
-        self.quant_conv = nn.Conv2d(ddconfig["z_channels"], embed_dim, 1)
-        self.post_quant_conv = torch.nn.Conv2d(embed_dim, ddconfig["z_channels"], 1)
+        Conv = nn.Conv3d if self.dim == 3 else nn.Conv2d
+        self.quant_conv = Conv(ddconfig["z_channels"], embed_dim, 1)
+        self.post_quant_conv = Conv(embed_dim, ddconfig["z_channels"], 1)
 
         self.loss_type = loss_type
         self.latent_loss_weight = latent_loss_weight
@@ -78,11 +80,18 @@ class RQVAE(Stage1Model):
 
     def encode(self, x):
         z_e = self.encoder(x)
-        z_e = self.quant_conv(z_e).permute(0, 2, 3, 1).contiguous()
+        z_e = self.quant_conv(z_e)
+        if self.dim == 3:
+            z_e = z_e.permute(0, 2, 3, 4, 1).contiguous()
+        else:
+            z_e = z_e.permute(0, 2, 3, 1).contiguous()
         return z_e
 
     def decode(self, z_q):
-        z_q = z_q.permute(0, 3, 1, 2).contiguous()
+        if self.dim == 3:
+            z_q = z_q.permute(0, 4, 1, 2, 3).contiguous()
+        else:
+            z_q = z_q.permute(0, 3, 1, 2).contiguous()
         z_q = self.post_quant_conv(z_q)
         out = self.decoder(z_q)
         return out
@@ -110,8 +119,9 @@ class RQVAE(Stage1Model):
     def get_recon_imgs(self, xs_real, xs_recon):
         """Convert real and reconstructed tensors into images for visualization."""
 
-        if xs_recon.shape[-2:] != xs_real.shape[-2:]:
-            xs_recon = F.interpolate(xs_recon, size=xs_real.shape[-2:], mode="bilinear", align_corners=False)
+        if xs_recon.shape[-self.dim:] != xs_real.shape[-self.dim:]:
+            mode = "trilinear" if self.dim == 3 else "bilinear"
+            xs_recon = F.interpolate(xs_recon, size=xs_real.shape[-self.dim:], mode=mode, align_corners=False)
 
         xs_real = xs_real * 0.5 + 0.5
         xs_recon = xs_recon * 0.5 + 0.5
@@ -121,8 +131,9 @@ class RQVAE(Stage1Model):
 
     def compute_loss(self, out, quant_loss, code, xs=None, valid=False):
 
-        if xs is not None and out.shape[-2:] != xs.shape[-2:]:
-            out = F.interpolate(out, size=xs.shape[-2:], mode="bilinear", align_corners=False)
+        if xs is not None and out.shape[-self.dim:] != xs.shape[-self.dim:]:
+            mode = "trilinear" if self.dim == 3 else "bilinear"
+            out = F.interpolate(out, size=xs.shape[-self.dim:], mode=mode, align_corners=False)
 
         if self.loss_type == 'mse':
             loss_recon = F.mse_loss(out, xs, reduction='mean')
