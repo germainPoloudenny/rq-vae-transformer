@@ -3,6 +3,8 @@ dataset:
   root: /home/gpoloudenny/Projects/crystallography/data/mp20/amplitudes/normalized.h5
   data_key: amplitudes
   hkl_max_index: 10
+  pad_to_cube: true
+  cube_size: 21
   transforms:
     type: none
 
