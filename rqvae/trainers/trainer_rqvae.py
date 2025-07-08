@@ -432,8 +432,9 @@ class Trainer(TrainerTemplate):
         tag = "reconstruction_" + decode_type + f"/{code_idx}-th code"
         self.writer.add_image(tag, grid, mode, epoch)
 
-    def save_ckpt(self, optimizer, scheduler, epoch):
-        ckpt_path = os.path.join(self.config.result_path, 'epoch%d_model.pt' % epoch)
+    def save_ckpt(self, optimizer, scheduler, epoch, *, best=False):
+        filename = 'best_model.pt' if best else f'epoch{epoch}_model.pt'
+        ckpt_path = os.path.join(self.config.result_path, filename)
         logger.info("epoch: %d, saving %s", epoch, ckpt_path)
         ckpt = {
             'epoch': epoch,

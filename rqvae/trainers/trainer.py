@@ -87,6 +87,9 @@ class TrainerTemplate():
             num_workers=num_workers
         )
 
+        # track the best validation loss for checkpointing
+        self.best_val_loss = float('inf')
+
     def train(self, optimizer=None, scheduler=None, scaler=None, epoch=0):
         raise NotImplementedError
 
@@ -114,11 +117,14 @@ class TrainerTemplate():
                     if self.model_ema is not None:
                         self.logging(summary_val_ema, scheduler=scheduler, epoch=i+1, mode='valid_ema')
 
-                if (i+1) % self.config.experiment.save_ckpt_freq == 0:
-                    self.save_ckpt(optimizer, scheduler, i+1)
+                    # save best model according to validation loss
+                    if summary_val['loss_total'] < self.best_val_loss:
+                        self.best_val_loss = summary_val['loss_total']
+                        self.save_ckpt(optimizer, scheduler, i+1, best=True)
 
-    def save_ckpt(self, optimizer, scheduler, epoch):
-        ckpt_path = os.path.join(self.config.result_path, 'epoch%d_model.pt' % epoch)
+    def save_ckpt(self, optimizer, scheduler, epoch, *, best=False):
+        filename = 'best_model.pt' if best else f'epoch{epoch}_model.pt'
+        ckpt_path = os.path.join(self.config.result_path, filename)
         logger.info("epoch: %d, saving %s", epoch, ckpt_path)
         ckpt = {
             'epoch': epoch,
