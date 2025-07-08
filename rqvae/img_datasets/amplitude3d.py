@@ -28,7 +28,8 @@ class Amplitude3D(Dataset):
 
     def __init__(self, root: str, split: str = "train", transform=None,
                  key: str = "amplitudes", max_index: Optional[int] = None,
-                 val_split: float = 0.1):
+                 val_split: float = 0.1, *, pad_to_cube: bool = False,
+                 cube_size: Optional[int] = None):
         self.root = Path(root)
         self.split = split
         self.transform = transform
@@ -36,6 +37,8 @@ class Amplitude3D(Dataset):
         self.max_index = max_index
         self.hkl_list = generate_hkl_list(max_index) if max_index is not None else None
         self.val_split = val_split
+        self.pad_to_cube = pad_to_cube
+        self.cube_size = cube_size
 
         if self.root.is_file():
             if self.root.suffix == '.npz':
@@ -83,6 +86,24 @@ class Amplitude3D(Dataset):
             volume[l_idx, h + self.max_index, k + self.max_index] = value
 
         amplitude = volume
+
+        if self.pad_to_cube:
+            # mirror positive l slices to negative indices and insert
+            # the l=0 slice at the center to build a full cube
+            positive = amplitude[1:]
+            amplitude = torch.cat([positive.flip(0), amplitude[:1], positive], dim=0)
+
+            cube_side = amplitude.shape[-1]
+            cube_size = self.cube_size if self.cube_size is not None else cube_side
+            if cube_size < cube_side:
+                raise ValueError('cube_size must be >= %d' % cube_side)
+            if cube_size != cube_side:
+                cube = amplitude.new_zeros(cube_size, cube_size, cube_size)
+                start = (cube_size - cube_side) // 2
+                cube[start:start+cube_side,
+                     start:start+cube_side,
+                     start:start+cube_side] = amplitude
+                amplitude = cube
 
         amplitude = amplitude.unsqueeze(0)
 

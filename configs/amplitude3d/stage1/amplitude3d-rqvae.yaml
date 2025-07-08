@@ -4,7 +4,7 @@ dataset:
   data_key: amplitudes
   hkl_max_index: 10
   pad_to_cube: true
-  cube_size: 21
+  cube_size: 32
   transforms:
     type: none
 

@@ -92,3 +92,8 @@ Alternatively you can provide a single file (for example `normalized.h5`).
 In this case the dataset is split on the fly using the `val_split` ratio
 (default `0.1`) passed to `Amplitude3D` when creating the dataset.
 
+The dataset can optionally expand the volume into a cube by mirroring the
+positive `l` slices. Enable this behaviour with `pad_to_cube: true` and set
+`cube_size` to the desired cube edge length. The resulting tensor will have
+shape `[1, cube_size, cube_size, cube_size]`.
+
