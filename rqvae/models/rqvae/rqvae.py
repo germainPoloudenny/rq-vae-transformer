@@ -20,7 +20,7 @@ from torch.nn import functional as F
 from ..interfaces import Stage1Model
 from .quantizations import RQBottleneck
 from .modules import Encoder, Decoder
-from .layers import ResnetBlock
+from .layers import ResnetBlock, conv_nd
 
 
 class RQVAE(Stage1Model):
@@ -41,6 +41,7 @@ class RQVAE(Stage1Model):
 
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
+        self.dim = ddconfig.get("dim", 2)
 
         def set_checkpointing(m):
             if isinstance(m, ResnetBlock):
@@ -65,8 +66,8 @@ class RQVAE(Stage1Model):
         else:
             raise ValueError("invalid 'bottleneck_type' (must be 'rq')")
 
-        self.quant_conv = nn.Conv2d(ddconfig["z_channels"], embed_dim, 1)
-        self.post_quant_conv = torch.nn.Conv2d(embed_dim, ddconfig["z_channels"], 1)
+        self.quant_conv = conv_nd(self.dim, ddconfig["z_channels"], embed_dim, 1)
+        self.post_quant_conv = conv_nd(self.dim, embed_dim, ddconfig["z_channels"], 1)
 
         self.loss_type = loss_type
         self.latent_loss_weight = latent_loss_weight
@@ -79,11 +80,16 @@ class RQVAE(Stage1Model):
 
     def encode(self, x):
         z_e = self.encoder(x)
-        z_e = self.quant_conv(z_e).permute(0, 2, 3, 1).contiguous()
+        z_e = self.quant_conv(z_e)
+        if self.dim == 3 and z_e.shape[2] == 1:
+            z_e = z_e.squeeze(2)
+        z_e = z_e.permute(0, 2, 3, 1).contiguous()
         return z_e
 
     def decode(self, z_q):
         z_q = z_q.permute(0, 3, 1, 2).contiguous()
+        if self.dim == 3:
+            z_q = z_q.unsqueeze(2)
         z_q = self.post_quant_conv(z_q)
         out = self.decoder(z_q)
         return out
