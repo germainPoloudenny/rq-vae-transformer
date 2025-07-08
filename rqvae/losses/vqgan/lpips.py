@@ -2,34 +2,10 @@
 """Stripped version of https://github.com/richzhang/PerceptualSimilarity/tree/master/models"""
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 from torchvision import models
 from collections import namedtuple
 
 from .lpips_utils import get_ckpt_path
-
-
-def _ensure_three_channels(x: torch.Tensor) -> torch.Tensor:
-    """Adjust input to have exactly 3 channels.
-
-    If ``x`` has fewer than 3 channels, channels are repeated. If it has more
-    than 3, only the first three channels are used.
-    """
-    c = x.shape[1]
-    if c == 3:
-        return x
-    if c < 3:
-        repeat = 3 // c + 1
-        x = x.repeat(1, repeat, 1, 1)
-    return x[:, :3]
-
-
-def _resize_to_min_size(x: torch.Tensor, min_size: int = 32) -> torch.Tensor:
-    """Resize tensor to at least ``min_size`` using bilinear upsampling."""
-    h, w = x.shape[-2:]
-    if h < min_size or w < min_size:
-        x = F.interpolate(x, size=(max(h, min_size), max(w, min_size)), mode='bilinear', align_corners=False)
-    return x
 
 
 class LPIPS(nn.Module):
@@ -63,10 +39,6 @@ class LPIPS(nn.Module):
         return model
 
     def forward(self, input, target, reduction='mean'):
-        input = _ensure_three_channels(input)
-        target = _ensure_three_channels(target)
-        input = _resize_to_min_size(input)
-        target = _resize_to_min_size(target)
         in0_input, in1_input = (self.scaling_layer(input), self.scaling_layer(target))
         outs0, outs1 = self.net(in0_input), self.net(in1_input)
         feats0, feats1, diffs = {}, {}, {}

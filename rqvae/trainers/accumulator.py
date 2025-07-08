@@ -109,13 +109,6 @@ class AccmStage1:
             loss_latent = dist_utils.all_gather_cat(distenv, loss_latent.unsqueeze(0)).sum()
             codes = [dist_utils.all_gather_cat(distenv, code) for code in codes]
 
-        # ``nn.DataParallel`` may expand scalar tensors into vectors whose length
-        # equals the number of devices. Sum over all elements to obtain a scalar
-        # value that is consistent across both single and multi-GPU execution.
-        loss_total = loss_total.sum()
-        loss_recon = loss_recon.sum()
-        loss_latent = loss_latent.sum()
-
         self.loss_total += loss_total.detach()
         self.loss_recon += loss_recon.detach()
         self.loss_latent += loss_latent.detach()
@@ -225,9 +218,7 @@ class AccmStage1WithGAN:
         for name, value in metrics_to_add.items():
             if name not in self.metrics_sum:
                 raise KeyError(f'unexpected metric name: {name}')
-            # ``nn.DataParallel`` may return vectors for scalar tensors. Reduce
-            # them so accumulation works regardless of the number of devices.
-            self.metrics_sum[name] += value.sum()
+            self.metrics_sum[name] += value
 
         for i in range(self.code_hier):
             assign_code(self.codebooks[i], codes[i].detach())

@@ -29,37 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_adaptive_weight(nll_loss, g_loss, last_layer):
-    """Compute the adaptive weight for balancing GAN loss.
-
-    ``torch.autograd.grad`` is incompatible with gradient checkpointing. To
-    support checkpointed models, the gradients are obtained via successive
-    ``backward`` calls on ``nll_loss`` and ``g_loss``. After the gradients are
-    measured, they are cleared so that the caller can perform its own backward
-    pass without interference.
-    """
-
-    # ``nll_loss`` and ``g_loss`` may occasionally be vectors when upstream
-    # losses are computed per-sample. Make sure they are scalar values so that
-    # ``backward()`` does not complain about implicit gradient creation.
-    if nll_loss.dim() != 0:
-        nll_loss = nll_loss.mean()
-
-    # gradient of reconstruction loss
-    if last_layer.grad is not None:
-        last_layer.grad = None
-    nll_loss.backward(retain_graph=True)
-    nll_grads = last_layer.grad.detach().clone()
-
-    if g_loss.dim() != 0:
-        g_loss = g_loss.mean()
-
-    # gradient of GAN loss
-    last_layer.grad = None
-    g_loss.backward(retain_graph=True)
-    g_grads = last_layer.grad.detach().clone()
-
-    # clear gradients so the caller can perform another backward pass
-    last_layer.grad = None
+    nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
+    g_grads = torch.autograd.grad(g_loss, last_layer, retain_graph=True)[0]
 
     d_weight = torch.norm(nll_grads) / (torch.norm(g_grads) + 1e-4)
     d_weight = torch.clamp(d_weight, 0.0, 1e4).detach()
@@ -282,16 +253,11 @@ class Trainer(TrainerTemplate):
                 g_weight = calculate_adaptive_weight(loss_recon + p_weight * loss_pcpt,
                                                      loss_gen,
                                                      last_layer=self.get_last_layer())
-                # the above uses backward calls to measure gradients;
-                # clear them before the main backward pass
-                model.zero_grad(set_to_none=True)
             else:
                 loss_gen = torch.zeros((), device=self.device)
                 g_weight = torch.zeros((), device=self.device)
 
             loss_gen_total = loss_rec_lat + p_weight * loss_pcpt + g_weight * self.disc_weight * loss_gen
-            if loss_gen_total.dim() != 0:
-                loss_gen_total = loss_gen_total.mean()
             loss_gen_total.backward()
 
             optimizer.step()
@@ -392,12 +358,6 @@ class Trainer(TrainerTemplate):
         xs_recon = model(xs_real)[0]
         xs_real, xs_recon = model.module.get_recon_imgs(xs_real, xs_recon)
 
-        # select up to three channels for visualization to avoid tensorboard
-        # errors when the dataset contains multi-channel images.
-        if xs_real.shape[1] > 3:
-            xs_real = xs_real[:, :3]
-            xs_recon = xs_recon[:, :3]
-
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
         grid = torchvision.utils.make_grid(grid, nrow=8)
         self.writer.add_image('reconstruction', grid, mode, epoch)
@@ -423,18 +383,13 @@ class Trainer(TrainerTemplate):
         xs_recon = model_fn.forward_partial_code(xs_real, code_idx, decode_type)
         xs_real, xs_recon = model_fn.get_recon_imgs(xs_real, xs_recon)
 
-        if xs_real.shape[1] > 3:
-            xs_real = xs_real[:, :3]
-            xs_recon = xs_recon[:, :3]
-
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
         grid = torchvision.utils.make_grid(grid, nrow=8)
         tag = "reconstruction_" + decode_type + f"/{code_idx}-th code"
         self.writer.add_image(tag, grid, mode, epoch)
 
-    def save_ckpt(self, optimizer, scheduler, epoch, *, best=False):
-        filename = 'best_model.pt' if best else f'epoch{epoch}_model.pt'
-        ckpt_path = os.path.join(self.config.result_path, filename)
+    def save_ckpt(self, optimizer, scheduler, epoch):
+        ckpt_path = os.path.join(self.config.result_path, 'epoch%d_model.pt' % epoch)
         logger.info("epoch: %d, saving %s", epoch, ckpt_path)
         ckpt = {
             'epoch': epoch,

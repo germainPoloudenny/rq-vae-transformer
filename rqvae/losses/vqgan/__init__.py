@@ -46,7 +46,6 @@ def create_discriminator_with_optimizer_scheduler(disc_config, steps_per_epoch, 
                                 n_layers=disc_config.arch.num_layers,
                                 use_actnorm=disc_config.arch.use_actnorm,
                                 ndf=disc_config.arch.ndf,
-                                dim=disc_config.arch.get('dim', 2),
                                 ).apply(weights_init)
 
     optimizer = create_resnet_optimizer(model, disc_config.optimizer)

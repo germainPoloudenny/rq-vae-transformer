@@ -75,19 +75,16 @@ class Amplitude3D(Dataset):
     def __getitem__(self, idx):
         amplitude = torch.from_numpy(self.data[idx]).float()
 
-        if amplitude.dim() == 1 and self.max_index is not None:
-            side = 2 * self.max_index + 1
-            num_slices = self.max_index + 1
+        side = 2 * self.max_index + 1
+        num_slices = self.max_index + 1
 
-            volume = amplitude.new_zeros(num_slices, side, side)
-            for value, (h, k, l_idx) in zip(amplitude, self.hkl_list):
-                volume[l_idx, h + self.max_index, k + self.max_index] = value
+        volume = amplitude.new_zeros(num_slices, side, side)
+        for value, (h, k, l_idx) in zip(amplitude, self.hkl_list):
+            volume[l_idx, h + self.max_index, k + self.max_index] = value
 
-            amplitude = volume
+        amplitude = volume
 
-        if amplitude.dim() == 3:
-            # convert to (C, D, H, W) for ``Conv3d`` with a single channel
-            amplitude = amplitude.unsqueeze(0)
+        amplitude = amplitude.unsqueeze(0)
 
         if self.transform:
             amplitude = self.transform(amplitude)

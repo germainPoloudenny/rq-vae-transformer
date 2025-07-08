@@ -18,17 +18,15 @@ def Normalize(in_channels):
 
 
 class Upsample(nn.Module):
-    def __init__(self, in_channels, with_conv, dim=2):
+    def __init__(self, in_channels, with_conv):
         super().__init__()
         self.with_conv = with_conv
-        self.dim = dim
-        Conv = nn.Conv3d if dim == 3 else nn.Conv2d
         if self.with_conv:
-            self.conv = Conv(in_channels,
-                             in_channels,
-                             kernel_size=3,
-                             stride=1,
-                             padding=1)
+            self.conv = torch.nn.Conv2d(in_channels,
+                                        in_channels,
+                                        kernel_size=3,
+                                        stride=1,
+                                        padding=1)
 
     def forward(self, x):
         x = torch.nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
@@ -38,80 +36,66 @@ class Upsample(nn.Module):
 
 
 class Downsample(nn.Module):
-    def __init__(self, in_channels, with_conv, dim=2):
+    def __init__(self, in_channels, with_conv):
         super().__init__()
         self.with_conv = with_conv
-        self.dim = dim
-        Conv = nn.Conv3d if dim == 3 else nn.Conv2d
         if self.with_conv:
             # no asymmetric padding in torch conv, must do it ourselves
-            self.conv = Conv(in_channels,
-                             in_channels,
-                             kernel_size=3,
-                             stride=2,
-                             padding=0)
+            self.conv = torch.nn.Conv2d(in_channels,
+                                        in_channels,
+                                        kernel_size=3,
+                                        stride=2,
+                                        padding=0)
 
     def forward(self, x):
         if self.with_conv:
-            spatial = x.shape[-self.dim:]
-            pads = [1] * self.dim
-            for i, s in enumerate(spatial[::-1]):
-                if s + pads[i] < 3:
-                    pads[i] = 3 - s
-            pad = []
-            for p in pads:
-                pad.extend([0, p])
-            x = F.pad(x, pad, mode="constant", value=0)
-            if all(s >= 1 for s in spatial):
-                x = self.conv(x)
+            pad = (0,1,0,1)
+            x = torch.nn.functional.pad(x, pad, mode="constant", value=0)
+            x = self.conv(x)
         else:
-            pool = F.avg_pool3d if self.dim == 3 else F.avg_pool2d
-            if all(s >= 2 for s in x.shape[-self.dim:]):
-                x = pool(x, kernel_size=2, stride=2)
+            x = torch.nn.functional.avg_pool2d(x, kernel_size=2, stride=2)
         return x
 
 
 class ResnetBlock(nn.Module):
     def __init__(self, *, in_channels, out_channels=None, conv_shortcut=False,
-                 dropout, temb_channels=512, dim=2):
+                 dropout, temb_channels=512):
         super().__init__()
         self.in_channels = in_channels
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
         self.use_conv_shortcut = conv_shortcut
         self.checkpointing = False
-        self.dim = dim
-        Conv = nn.Conv3d if dim == 3 else nn.Conv2d
 
         self.norm1 = Normalize(in_channels)
-        self.conv1 = Conv(in_channels,
-                          out_channels,
-                          kernel_size=3,
-                          stride=1,
-                          padding=1)
+        self.conv1 = torch.nn.Conv2d(in_channels,
+                                     out_channels,
+                                     kernel_size=3,
+                                     stride=1,
+                                     padding=1)
         if temb_channels > 0:
             self.temb_proj = torch.nn.Linear(temb_channels,
                                              out_channels)
         self.norm2 = Normalize(out_channels)
         self.dropout = torch.nn.Dropout(dropout, inplace=True)
-        self.conv2 = Conv(out_channels,
-                          out_channels,
-                          kernel_size=3,
-                          stride=1,
-                          padding=1)
+        self.conv2 = torch.nn.Conv2d(out_channels,
+                                     out_channels,
+                                     kernel_size=3,
+                                     stride=1,
+                                     padding=1)
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
-                self.conv_shortcut = Conv(in_channels,
-                                         out_channels,
-                                         kernel_size=3,
-                                         stride=1,
-                                         padding=1)
+                self.conv_shortcut = torch.nn.Conv2d(in_channels,
+                                                     out_channels,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1)
             else:
-                self.nin_shortcut = Conv(in_channels,
-                                         out_channels,
-                                         kernel_size=1,
-                                         stride=1,
-                                         padding=0)
+                self.nin_shortcut = torch.nn.Conv2d(in_channels,
+                                                    out_channels,
+                                                    kernel_size=1,
+                                                    stride=1,
+                                                    padding=0)
 
     def _forward(self, x, temb):
         h = x
@@ -120,8 +104,7 @@ class ResnetBlock(nn.Module):
         h = self.conv1(h)
 
         if temb is not None:
-            add_shape = (h.shape[0], -1) + (1,)*self.dim
-            h = h + self.temb_proj(nonlinearity(temb)).view(*add_shape)
+            h = h + self.temb_proj(nonlinearity(temb))[:,:,None,None]
 
         h = self.norm2(h)
         h = nonlinearity(h)
@@ -145,33 +128,31 @@ class ResnetBlock(nn.Module):
 
 
 class AttnBlock(nn.Module):
-    def __init__(self, in_channels, dim=2):
+    def __init__(self, in_channels):
         super().__init__()
         self.in_channels = in_channels
-        self.dim = dim
-        Conv = nn.Conv3d if dim == 3 else nn.Conv2d
 
         self.norm = Normalize(in_channels)
-        self.q = Conv(in_channels,
-                      in_channels,
-                      kernel_size=1,
-                      stride=1,
-                      padding=0)
-        self.k = Conv(in_channels,
-                      in_channels,
-                      kernel_size=1,
-                      stride=1,
-                      padding=0)
-        self.v = Conv(in_channels,
-                      in_channels,
-                      kernel_size=1,
-                      stride=1,
-                      padding=0)
-        self.proj_out = Conv(in_channels,
-                             in_channels,
-                             kernel_size=1,
-                             stride=1,
-                             padding=0)
+        self.q = torch.nn.Conv2d(in_channels,
+                                 in_channels,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+        self.k = torch.nn.Conv2d(in_channels,
+                                 in_channels,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+        self.v = torch.nn.Conv2d(in_channels,
+                                 in_channels,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+        self.proj_out = torch.nn.Conv2d(in_channels,
+                                        in_channels,
+                                        kernel_size=1,
+                                        stride=1,
+                                        padding=0)
 
 
     def forward(self, x):
@@ -181,19 +162,20 @@ class AttnBlock(nn.Module):
         k = self.k(h_)
         v = self.v(h_)
 
-        spatial = q.shape[2:]
-        b, c = q.shape[:2]
-        hw = int(np.prod(spatial))
-        q = q.reshape(b, c, hw).permute(0, 2, 1)
-        k = k.reshape(b, c, hw)
-        w_ = torch.bmm(q, k)
+        # compute attention
+        b,c,h,w = q.shape
+        q = q.reshape(b,c,h*w)
+        q = q.permute(0,2,1)   # b,hw,c
+        k = k.reshape(b,c,h*w) # b,c,hw
+        w_ = torch.bmm(q,k)     # b,hw,hw    w[b,i,j]=sum_c q[b,i,c]k[b,c,j]
         w_ = w_ * (int(c)**(-0.5))
         w_ = torch.nn.functional.softmax(w_, dim=2)
 
-        v = v.reshape(b, c, hw)
-        w_ = w_.permute(0, 2, 1)
-        h_ = torch.bmm(v, w_)
-        h_ = h_.reshape(b, c, *spatial)
+        # attend to values
+        v = v.reshape(b,c,h*w)
+        w_ = w_.permute(0,2,1)   # b,hw,hw (first hw of k, second of q)
+        h_ = torch.bmm(v,w_)     # b, c,hw (hw of q) h_[b,c,j] = sum_i v[b,c,i] w_[b,i,j]
+        h_ = h_.reshape(b,c,h,w)
 
         h_ = self.proj_out(h_)
 
