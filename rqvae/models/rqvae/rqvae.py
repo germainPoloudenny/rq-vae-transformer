@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import torch
-from torch import nn
 from torch.nn import functional as F
 
 from ..interfaces import Stage1Model
@@ -81,8 +79,17 @@ class RQVAE(Stage1Model):
     def encode(self, x):
         z_e = self.encoder(x)
         z_e = self.quant_conv(z_e)
-        if self.dim == 3 and z_e.shape[2] == 1:
-            z_e = z_e.squeeze(2)
+        if self.dim == 3:
+            if z_e.dim() == 5 and z_e.shape[2] == 1:
+                # RQVAE with 3D convolutions expects the depth dimension to be
+                # collapsed to 1 after encoding. If so, remove the singleton
+                # dimension to obtain a 4-D tensor.
+                z_e = z_e.squeeze(2)
+            elif z_e.dim() == 5:
+                raise ValueError(
+                    f"Expected encoded feature maps to have depth=1 for 3D inputs,"
+                    f" but got shape {z_e.shape}"
+                )
         z_e = z_e.permute(0, 2, 3, 1).contiguous()
         return z_e
 

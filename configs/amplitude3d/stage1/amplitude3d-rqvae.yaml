@@ -15,8 +15,8 @@ arch:
     bottleneck_type: rq
     embed_dim: 256
     n_embed: 2048
-    # Five downsampling stages keep 21×21×21 volumes large enough
-    # to produce a 1×1×1 latent representation.
+    # Six encoder stages ensure a 21×21×21 input is reduced to a
+    # single latent voxel without hitting a 0-sized feature map.
     latent_shape: [ 1, 1, 256 ]
     code_shape: [ 1, 1, 4 ]
     shared_codebook: true
@@ -33,8 +33,8 @@ arch:
     out_ch: 1
     dim: 3
     ch: 64
-    # Use five stages to downsample 21³ volumes to a single latent voxel.
-    ch_mult: [ 1, 1, 2, 2, 4 ]
+    # Six stages (five downsamples) reduce a 21×21×21 input to a single voxel.
+    ch_mult: [ 1, 1, 2, 2, 4, 4 ]
     num_res_blocks: 2
     attn_resolutions: [ 16 ]
     dropout: 0.00

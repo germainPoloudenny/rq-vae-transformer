@@ -1,5 +1,10 @@
-"""Adapted and modified from https://github.com/CompVis/taming-transformers"""
-"""Stripped version of https://github.com/richzhang/PerceptualSimilarity/tree/master/models"""
+"""LPIPS perceptual metric used in VQGAN training.
+
+This implementation is adapted from `taming-transformers` and stripped
+down from `PerceptualSimilarity`_.
+
+.. _PerceptualSimilarity: https://github.com/richzhang/PerceptualSimilarity
+"""
 import torch
 import torch.nn as nn
 from torchvision import models
@@ -31,15 +36,19 @@ class LPIPS(nn.Module):
 
     @classmethod
     def from_pretrained(cls, name="vgg_lpips"):
-        if name is not "vgg_lpips":
+        if name != "vgg_lpips":
             raise NotImplementedError
         model = cls()
         ckpt = get_ckpt_path(name)
         model.load_state_dict(torch.load(ckpt, map_location=torch.device("cpu")), strict=False)
         return model
 
-    def forward(self, input, target, reduction='mean'):
-        in0_input, in1_input = (self.scaling_layer(input), self.scaling_layer(target))
+    def _forward_4d(self, input, target):
+        """Compute LPIPS on 4-D image tensors."""
+        in0_input, in1_input = (
+            self.scaling_layer(input),
+            self.scaling_layer(target),
+        )
         outs0, outs1 = self.net(in0_input), self.net(in1_input)
         feats0, feats1, diffs = {}, {}, {}
         lins = [self.lin0, self.lin1, self.lin2, self.lin3, self.lin4]
@@ -49,13 +58,31 @@ class LPIPS(nn.Module):
 
         res = [spatial_average(lins[kk].model(diffs[kk]), keepdim=True) for kk in range(len(self.chns))]
         val = res[0]
-        for l in range(1, len(self.chns)):
-            val += res[l]
+        for idx in range(1, len(self.chns)):
+            val += res[idx]
+        return val
+
+    def forward(self, input, target, reduction='mean'):
+        if input.dim() == 5:
+            if input.shape[1] == 1:
+                input = input.repeat(1, 3, 1, 1, 1)
+                target = target.repeat(1, 3, 1, 1, 1)
+            b, c, d, h, w = input.shape
+            input_flat = input.permute(0, 2, 1, 3, 4).reshape(b * d, c, h, w)
+            target_flat = target.permute(0, 2, 1, 3, 4).reshape(b * d, c, h, w)
+            val = self._forward_4d(input_flat, target_flat)
+            val = val.view(b, d, -1).mean(dim=1)
+        else:
+            if input.dim() == 4 and input.shape[1] == 1:
+                input = input.repeat(1, 3, 1, 1)
+                target = target.repeat(1, 3, 1, 1)
+            val = self._forward_4d(input, target)
+
         if reduction == 'none':
             return val
-        elif reduction == 'mean':
+        if reduction == 'mean':
             return torch.mean(val)
-        elif reduction == 'sum':
+        if reduction == 'sum':
             return torch.sum(val)
 
 
@@ -118,10 +145,10 @@ class vgg16(torch.nn.Module):
         return out
 
 
-def normalize_tensor(x,eps=1e-10):
-    norm_factor = torch.sqrt(torch.sum(x**2,dim=1,keepdim=True))
-    return x/(norm_factor+eps)
+def normalize_tensor(x, eps=1e-10):
+    norm_factor = torch.sqrt(torch.sum(x ** 2, dim=1, keepdim=True))
+    return x / (norm_factor + eps)
 
 
 def spatial_average(x, keepdim=True):
-    return x.mean([2,3],keepdim=keepdim)
+    return x.mean([2, 3], keepdim=keepdim)
