@@ -28,7 +28,7 @@ arch:
   ddconfig:
     double_z: false
     z_channels: 256
-    resolution: 21
+    resolution: 32
     in_channels: 1
     out_ch: 1
     dim: 3
@@ -56,7 +56,7 @@ optimizer:
 
 
 experiment:
-  batch_size: 128
+  batch_size: 256
   epochs: 1500
   save_ckpt_freq: 10
   test_freq: 1

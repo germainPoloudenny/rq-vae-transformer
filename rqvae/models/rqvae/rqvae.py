@@ -138,7 +138,10 @@ class RQVAE(Stage1Model):
         else:
             raise ValueError('incompatible loss type')
 
-        loss_latent = quant_loss
+        # ``quant_loss`` may be returned as a vector when ``DataParallel``
+        # gathers scalars from multiple devices. Reduce it to a scalar so that
+        # all loss values remain 0-dimensional tensors.
+        loss_latent = quant_loss.mean()
 
         if valid:
             loss_recon = loss_recon * xs.shape[0] * xs.shape[1]
