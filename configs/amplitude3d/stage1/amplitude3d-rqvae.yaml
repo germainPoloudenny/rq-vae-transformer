@@ -1,6 +1,6 @@
 dataset:
   type: amplitude3d
-  root: /home/gpoloudenny/Projects/crystallography/data/mp20/amplitudes/normalized.h5
+  root: /home/gpoloudenny/Projects/crystallography/data/gpu/crystallm/amplitudes/normalized.h5
   data_key: amplitudes
   hkl_max_index: 10
   pad_to_cube: true
@@ -56,9 +56,9 @@ optimizer:
 
 
 experiment:
-  batch_size: 1
-  epochs: 150
-  save_ckpt_freq: 5
+  batch_size: 128
+  epochs: 1500
+  save_ckpt_freq: 10
   test_freq: 1
 
 gan:

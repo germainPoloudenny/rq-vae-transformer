@@ -322,6 +322,9 @@ class Trainer(TrainerTemplate):
                 if (global_iter+1) % 250 == 0:
                     xs_real, xs_recon = model.module.get_recon_imgs(xs[:16], xs_recon[:16])
                     grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
+                    if grid.dim() == 5:
+                        depth = grid.shape[2] // 2
+                        grid = grid[:, :, depth]
                     grid = torchvision.utils.make_grid(grid, nrow=8)
                     self.writer.add_image('reconstruction_step', grid, 'train', global_iter)
 
@@ -373,6 +376,9 @@ class Trainer(TrainerTemplate):
         xs_real, xs_recon = model.module.get_recon_imgs(xs_real, xs_recon)
 
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
+        if grid.dim() == 5:
+            depth = grid.shape[2] // 2
+            grid = grid[:, :, depth]
         grid = torchvision.utils.make_grid(grid, nrow=8)
         self.writer.add_image('reconstruction', grid, mode, epoch)
 
@@ -398,12 +404,16 @@ class Trainer(TrainerTemplate):
         xs_real, xs_recon = model_fn.get_recon_imgs(xs_real, xs_recon)
 
         grid = torch.cat([xs_real[:8], xs_recon[:8], xs_real[8:], xs_recon[8:]], dim=0)
+        if grid.dim() == 5:
+            depth = grid.shape[2] // 2
+            grid = grid[:, :, depth]
         grid = torchvision.utils.make_grid(grid, nrow=8)
         tag = "reconstruction_" + decode_type + f"/{code_idx}-th code"
         self.writer.add_image(tag, grid, mode, epoch)
 
-    def save_ckpt(self, optimizer, scheduler, epoch):
-        ckpt_path = os.path.join(self.config.result_path, 'epoch%d_model.pt' % epoch)
+    def save_ckpt(self, optimizer, scheduler, epoch, *, best=False):
+        filename = 'best_model.pt' if best else f'epoch{epoch}_model.pt'
+        ckpt_path = os.path.join(self.config.result_path, filename)
         logger.info("epoch: %d, saving %s", epoch, ckpt_path)
         ckpt = {
             'epoch': epoch,
