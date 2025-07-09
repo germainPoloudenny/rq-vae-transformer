@@ -271,7 +271,10 @@ class Trainer(TrainerTemplate):
                 loss_gen = torch.zeros((), device=self.device)
                 g_weight = torch.zeros((), device=self.device)
 
-            loss_gen_total = loss_rec_lat + p_weight * loss_pcpt + g_weight * self.disc_weight * loss_gen
+            loss_gen_total = loss_rec_lat + p_weight * loss_pcpt
+            loss_gen_total = loss_gen_total + g_weight * self.disc_weight * loss_gen
+            # ensure the loss is a scalar before backpropagation
+            loss_gen_total = loss_gen_total.mean()
             loss_gen_total.backward()
 
             optimizer.step()
