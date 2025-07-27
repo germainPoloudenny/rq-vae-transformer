@@ -1,6 +1,6 @@
 dataset:
   type: amplitude3d
-  root: /home/gpoloudenny/Projects/crystallography/data/gpu/crystallm/amplitudes/normalized.h5
+  root: /home/gpoloudenny/Projects/crystallography/data/crystallm/amplitudes/normalized.h5
   data_key: amplitudes
   hkl_max_index: 10
   pad_to_cube: true
