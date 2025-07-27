@@ -75,9 +75,6 @@ class Amplitude3D(Dataset):
             self.start = 0
             self.end = len(dataset)
 
-        if self.max_index is not None:
-            self.end = min(self.start + self.max_index, self.end)
-
         self.data = dataset
 
     def __len__(self):
