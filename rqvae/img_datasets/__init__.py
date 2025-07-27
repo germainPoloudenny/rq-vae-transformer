@@ -4,7 +4,7 @@ from torch.utils.data import Subset
 from torchvision.datasets import ImageNet
 
 from .transforms import create_transforms
-from .amplitude3d import Amplitude3D
+from rqvae.img_datasets.amplitude3d import Amplitude3D
 
 SMOKE_TEST = bool(os.environ.get("SMOKE_TEST", 0))
 
