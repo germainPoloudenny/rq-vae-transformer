@@ -28,16 +28,32 @@ from .trainer import TrainerTemplate
 logger = logging.getLogger(__name__)
 
 
-def calculate_adaptive_weight(nll_loss, g_loss, last_layer):
-    """Compute adaptive weight for adversarial loss using gradient norms."""
+def calculate_adaptive_weight(nll_loss, g_loss, last_layer, *,
+                              model=None, checkpointing=False):
+    """Compute adaptive weight for adversarial loss using gradient norms.
 
-    # gradient of reconstruction/perceptual loss
-    nll_grads = torch.autograd.grad(nll_loss, last_layer,
-                                    retain_graph=True, create_graph=True)[0]
+    When activation checkpointing is used, ``torch.autograd.grad`` can raise
+    errors.  In that case the gradients are obtained via ``backward`` calls and
+    the model's gradients are cleared afterwards.
+    """
 
-    # gradient of adversarial generator loss
-    g_grads = torch.autograd.grad(g_loss, last_layer,
-                                  retain_graph=True, create_graph=True)[0]
+    if checkpointing:
+        if model is None:
+            raise ValueError("model must be provided when checkpointing is True")
+
+        model.zero_grad(set_to_none=True)
+        nll_loss.backward(retain_graph=True)
+        nll_grads = last_layer.grad.detach().clone()
+        model.zero_grad(set_to_none=True)
+
+        g_loss.backward(retain_graph=True)
+        g_grads = last_layer.grad.detach().clone()
+        model.zero_grad(set_to_none=True)
+    else:
+        nll_grads = torch.autograd.grad(nll_loss, last_layer,
+                                        retain_graph=True, create_graph=True)[0]
+        g_grads = torch.autograd.grad(g_loss, last_layer,
+                                      retain_graph=True, create_graph=True)[0]
 
     d_weight = torch.norm(nll_grads) / (torch.norm(g_grads) + 1e-4)
     d_weight = torch.clamp(d_weight, 0.0, 1e4).detach()
@@ -257,9 +273,13 @@ class Trainer(TrainerTemplate):
 
             if use_discriminator:
                 loss_gen, _, _ = self.gan_loss(xs, xs_recon, mode='gen')
-                g_weight = calculate_adaptive_weight(loss_recon + p_weight * loss_pcpt,
-                                                     loss_gen,
-                                                     last_layer=self.get_last_layer())
+                g_weight = calculate_adaptive_weight(
+                    loss_recon + p_weight * loss_pcpt,
+                    loss_gen,
+                    last_layer=self.get_last_layer(),
+                    model=self.model,
+                    checkpointing=self.config.arch.checkpointing,
+                )
             else:
                 loss_gen = torch.zeros((), device=self.device)
                 g_weight = torch.zeros((), device=self.device)
@@ -354,9 +374,9 @@ class Trainer(TrainerTemplate):
         if mode == 'train':
             self.writer.add_scalar('lr', scheduler.get_last_lr()[0], mode, epoch)
 
-        line = f"""ep:{epoch}, {mode:10s}, """
+        line = f"ep:{epoch}, {mode:10s}, "
         line += summary.print_line()
-        line += f""", """
+        line += ", "
         if scheduler:
             line += f"""lr: {scheduler.get_last_lr()[0]:e}"""
 
