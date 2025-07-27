@@ -131,10 +131,16 @@ Our implementation uses `DistributedDataParallel` in `Pytorch` for efficient tra
     python -m torch.distributed.launch \
         --master_addr=$MASTER_ADDR \
         --master_port=$PORT \
-        --nnodes=4 --nproc_per_node=1 --node_rank=$RANK \ 
+        --nnodes=4 --nproc_per_node=1 --node_rank=$RANK \
         main_stage1.py \
         -m=configs/imagenet256/stage1/in256-rqvae-8x8x4.yaml -r=$SAVE_DIR
     ```
+
+When `checkpointing: true` is set in the configuration, the trainer avoids
+using ``torch.autograd.grad`` for computing the adversarial weight. Instead it
+falls back to a ``backward``-based implementation. If you customize the training
+loop and encounter a runtime error from ``torch.autograd.grad`` with
+checkpointing, consider disabling checkpointing or following this behavior.
 
 
 ### Finetuning of Pretrained RQ-VAE
