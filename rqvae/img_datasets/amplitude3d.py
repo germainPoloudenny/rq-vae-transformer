@@ -40,20 +40,24 @@ class Amplitude3D(Dataset):
         self.pad_to_cube = pad_to_cube
         self.cube_size = cube_size
 
+        self.h5_file = None
         if self.root.is_file():
             if self.root.suffix == '.npz':
-                data_all = np.load(self.root)[key]
+                dataset = np.load(self.root, mmap_mode='r')[key]
             elif self.root.suffix in ['.h5', '.hdf5']:
-                with h5py.File(self.root, 'r') as f:
-                    data_all = f[key][:]
+                self.h5_file = h5py.File(self.root, 'r')
+                dataset = self.h5_file[key]
             else:
                 raise ValueError(f'Unsupported extension: {self.root.suffix}')
 
-            split_idx = int(len(data_all) * (1 - self.val_split))
+            total_len = len(dataset)
+            split_idx = int(total_len * (1 - self.val_split))
             if split == 'train':
-                data = data_all[:split_idx]
+                self.start = 0
+                self.end = split_idx
             elif split == 'val':
-                data = data_all[split_idx:]
+                self.start = split_idx
+                self.end = total_len
             else:
                 raise ValueError(f'Unknown split: {split}')
         else:
@@ -61,22 +65,26 @@ class Amplitude3D(Dataset):
             h5_file = self.root / f"{split}.h5"
 
             if npz_file.exists():
-                data = np.load(npz_file)[key]
+                dataset = np.load(npz_file, mmap_mode='r')[key]
             elif h5_file.exists():
-                with h5py.File(h5_file, 'r') as f:
-                    data = f[key][:]
+                self.h5_file = h5py.File(h5_file, 'r')
+                dataset = self.h5_file[key]
             else:
                 raise FileNotFoundError(
                     f"Amplitude file not found: {npz_file} or {h5_file}")
+            self.start = 0
+            self.end = len(dataset)
+
         if self.max_index is not None:
-            data = data[: self.max_index]
-        self.data = data
+            self.end = min(self.start + self.max_index, self.end)
+
+        self.data = dataset
 
     def __len__(self):
-        return len(self.data)
+        return self.end - self.start
 
     def __getitem__(self, idx):
-        amplitude = torch.from_numpy(self.data[idx]).float()
+        amplitude = torch.from_numpy(self.data[self.start + idx]).float()
 
         side = 2 * self.max_index + 1
         num_slices = self.max_index + 1
@@ -111,3 +119,10 @@ class Amplitude3D(Dataset):
             amplitude = self.transform(amplitude)
 
         return amplitude, 0
+
+    def __del__(self):
+        if getattr(self, 'h5_file', None) is not None:
+            try:
+                self.h5_file.close()
+            except Exception:
+                pass

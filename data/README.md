@@ -88,6 +88,11 @@ with h5py.File('train.h5', 'w') as f:
 `Amplitude3D` will automatically detect which extension is available when
 loading each split.
 
+When loading `.npz` archives the arrays are memory-mapped and no longer
+copied into memory at construction time. Likewise, `.h5` files keep an
+open handle so that samples are fetched lazily on demand. This greatly
+reduces the initial memory footprint when working with large datasets.
+
 Alternatively you can provide a single file (for example `normalized.h5`).
 In this case the dataset is split on the fly using the `val_split` ratio
 (default `0.1`) passed to `Amplitude3D` when creating the dataset.
