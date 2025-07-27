@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+from torchvision.models import Inception_V3_Weights
 
 try:
     from torchvision.models.utils import load_state_dict_from_url
@@ -81,7 +82,9 @@ class InceptionV3(nn.Module):
         if use_fid_inception:
             inception = fid_inception_v3()
         else:
-            inception = _inception_v3(pretrained=True)
+            inception = _inception_v3(
+                weights=Inception_V3_Weights.IMAGENET1K_V1
+            )
 
         # Block 0: input to maxpool1
         block0 = [
